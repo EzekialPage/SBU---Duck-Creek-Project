@@ -20,4 +20,3 @@ if (Compare-Object -ReferenceObject  $(Get-Content $prevFile) -DifferenceObject 
 } else {
         "The files were the same"
 }
-i changed stuff
