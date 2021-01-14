@@ -1,0 +1,29 @@
+TESTING DOCUMENTATION
+This document will explain how to configure the scripts and file structure
+as well as the necessary steps in order to test the functionality of the scripts
+
+SETUP:
+1. Download the Duck Creek file structure
+
+2. Adjust the variable named $clientPath in any scripts you will use to match
+your file structure. 
+example: 
+Default
+$clientPath = 'C:\Users\ebpag\Desktop\DuckCreek\' + $clientName + '\'+ $clientLOBName
+
+Adjusted
+$clientPath = 'C:\(Your path to the Duck Creek folder)\DuckCreek\' + $clientName + '\'+ $clientLOBName
+
+3. Once your file strucutre is in the path variable, you are now ready to move on to running the scripts
+
+RUNNING:
+1. When you run the script you will be promped to enter a client name. 
+Enter TESTCLIENT into the blank and press ENTER to continue.
+
+2. Next you will be asked for the client LOB(Line of business). Enter
+the part number of the script that you are currently running (ex. Part4) 
+into the blank and press ENTER to continue.
+
+3. ON PART 4 ONLY you will be prompted to enter a version number. Enter 
+10_41_0_0 to get the default results. Changing the version number will adjust
+output.
