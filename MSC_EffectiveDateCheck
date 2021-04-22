@@ -1,0 +1,61 @@
+Write-Output "Fourth part"
+#Fourth part of MS catalog validation scripts
+#Checks if the Carrier rating manuscripts have the correct effective dates in ms catalog.
+
+#input from employee
+$clientName = Read-Host -Prompt "Enter client name (ex. TESTCLIENT) "
+$clientLOB = Read-Host -Prompt "Enter client's LOB folder (ex. Property) "
+$effectiveDates = Read-Host -Prompt "Enter effective dates (ex. AR_00_44, 2020-12-01, MT_00_42, 2020-11-01,etc...) "
+#$filePath = 'C:\Users\ezekial.page\Desktop\ManuScriptCatalog.xml'
+$filePath = "C:\SaaS\$clientName\shared\ManuScriptCatalog.xml"
+
+#separate effective date input
+$splitArr = $effectiveDates -split ", "
+$datesList = [object][System.Collections.ArrayList]@()
+For($i = 0; $i -lt $splitArr.Length; $i += 2){
+    $datesList.Add($splitArr[$i])
+    $datesList.Add($splitArr[$i+1])
+
+}
+
+#check contents of xml file for effective dates
+[XML] $inFile = Get-Content $filePath
+$idCheckBase = "Carrier_" + $clientLOB 
+for($j = 0; $j -lt $datesList.Count;$j +=2){
+    $flag = $false
+    $outString = ""
+    $idCheck = $idCheckBase + "_" + $datesList[$j]
+    $compDate = $datesList[$j+1]
+    #Write-Host "CompDate: "$compDate
+    foreach($empDetail in $inFile.entries.entry){
+        if($empDetail.ID -match $idCheck){
+        #Write-Host "Check: " + $empDetail.ID
+            $entryFlag = $true
+            $versionDate = $empDetail.versionDate
+            $effectiveDateNew = $empDetail.effectiveDateNew
+            $effectiveDateRenewal = $empDetail.effectiveDateRenewal
+
+            If($versionDate -ne $compDate){
+                $outString += "Incorrect versionDate attribute.`n"
+                $flag  = $true
+            }
+            If($effectiveDateNew -ne $compDate){
+                $outString += "Incorrect effectiveDateNew attribute.`n"
+                $flag  = $true
+            }
+            If($effectiveDateRenewal -ne $compDate){
+                $outString += "Incorrect effectiveDateRenewal attribute.`n"
+                $flag  = $true
+            }
+            $outString += "`n"
+
+            If($flag){
+                Write-Host "ID:" $empDetail.ID -ForegroundColor Red
+                Write-Host $outString "`n"
+            }else{
+                Write-Host "ID:" $empDetail.ID -ForegroundColor Green
+                Write-Host "No Errors found`n"
+            }
+        }
+    }
+}
