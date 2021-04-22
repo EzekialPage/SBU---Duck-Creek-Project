@@ -1,69 +1,127 @@
-﻿Write-Host "Fourth part:"
+Write-Host "Fourth part:"
 #This script will iterate through a file structure, find the newest version 
 #of a product file (if any) and verify manuscripts table values
 
 #Prompt user input and create pathing variables
-$clientName = Read-Host -Prompt "Enter client name to verfiy there is a table or not (ex. TESTCLIENT)"
+$clientName = Read-Host -Prompt "Enter client name(ex. TESTCLIENT)"
 $clientLOB = Read-Host -Prompt "Enter LOB "
-$tableLOB = '<table id="Manuscripts' + $clientLOB
 $version = Read-Host -Prompt "Enter version Number (ex. 10_X_X_X)"
-$clientPath = "C:\Users\ebpag\Desktop\DuckCreek\$clientName\$clientLOB"
-$fileName = "*" +$clientLOB + "_Product_*.xml"
+#$clientPath = "C:\Users\Family\Desktop\TempDCT\$clientName\$clientLOB\US-INH\*_Product_*.xml"
+$clientPath = "C:\SaaS\$clientName\Policy\ManuScripts\DCTTemplates\$clientLOB\US-INH\*_Product_*.xml"
+
+
+#Create table lob id 
+if ($clientLOB -Match "Carrier") {
+    $clientLOB = $clientLOB -replace "Carrier" 
+    $tableLOB = '<table id="Manuscripts' + $clientLOB
+} else {
+    $tableLOB = '<table id="Manuscripts' + $clientLOB
+}
+
 
 #Determine path of newest version
-function newestPath($clPath){
-    $newestPath = ""
-    Get-ChildItem -Path $clPath | ForEach{
-        if($_.Name -gt $newestPath){
-            $newestPath = $_.FullName
+function newestVersion($clPath) {
+    $maxVer = @(0, 0, 0, 0)
+    $currentVer = @(0, 0, 0, 0)
+    $doubleArr = @($currentVer, $maxVer)
+    $output = ""
+    Get-ChildItem -Path $clPath | ForEach {
+        $counter = 0
+        $splitArr = ""
+        $splitArr = $_.BaseName.Split("_") 
+        for ($i = 0; $i -lt $splitArr.Length; $i++) {
+            if ($splitArr[$i] -match "^\d+$") {
+                $currentVer[$counter] = $splitArr[$i]
+                $counter++
+            }
+        }
+        $doubleArr[0] = $currentVer
+        $doubleArr[1] = $maxVer
+        $compVal = compareVer($doubleArr)
+        if ($compVal -eq 1){
+            for ($j = 0; $j -lt $maxVer.Length; $j++) {
+                $maxVer[$j] = $CurrentVer[$j]
+            }
+            $output = $_.FullName
+        } elseif($compVal -ne 2) {
+            Write-Host "Error in compare output"
         }
     }
-    return $newestPath
+    return $output
 }
-#iterate through client folder
-Get-ChildItem -Path $clientPath | ForEach{
-    #store output variables
-    $ifTrue = "False"
-    Write-Host "Folder: " $_.Name
-    $old = $_.FullName+"\$fileName"
-    $newPath = newestPath($old)
 
-    #check for valid product file
-    if($newPath -ne ""){
-        #check for valid table
-        $tableLine = Get-ChildItem -Path $newPath | Select-String -Pattern $tableLOB -Quiet
-        if ($tableLine) {
-            [XML]$tableData = Get-Content $newPath
-            #iterate through xml file
-            foreach($empDetail in $tableData.manuscript.model.object.table) {
-                $tableName = $empDetail.id
-                $targetName = "Manuscripts"+$clientLOB
-                #look for table with correct name
-                if($tableName -eq $targetName){
-                    #stop and set flag true if valid version numbers found in table
-                    $compareString = $empDetail.data.row.value
-                    if ($compareString -match $version ) {
-                        $ifTrue = "True"
-                        break
+#function to compare version number arrays
+#outputs 1 if first paramater is newer or 2 if second paramater is newer
+function compareVer($inArr) {
+    $arr1= $inArr[0]
+    $arr2 = $inArr[1]
+    for ($i = 0; $i -lt $arr1.count; $i++) {
+        if ($arr1[$i] -gt $arr2[$i]) {
+            return 1
+        } elseif ($arr2[$i] -gt $arr1[$i]) {
+            return 2
+        }
+    }
+}
+
+#store output variables
+$flag = $true
+$newPath = newestVersion($clientPath)
+#check for valid product file
+if($newPath -ne "") {
+    #check for valid table
+    $tableLine = Get-ChildItem -Path $newPath | Select-String -Pattern $tableLOB -Quiet
+    if ($tableLine) {
+        [XML]$tableData = Get-Content $newPath
+        $overrideCheck = 0
+        #iterate through xml file
+        $counter = 0
+        $valueArr = @($null, $null, $null, $null)
+        foreach ($empDetail in $tableData.ManuScript.model.object.table) {
+            $tableName = $empDetail.id
+            $targetName = "Manuscripts"+$clientLOB
+            #look for table with correct name
+            if ($tableName -eq $targetName) {
+                #check table for override
+                if ($empDetail.override -eq 1) {
+                    $overrideCheck = 1
+                }
+                foreach($empDetail2 in $empDetail.data.row.value){
+                    #create array of values to check for updates
+                    if($counter -lt 4){
+                        $valueArr[$counter] = $empDetail2
+                        $counter++
                     }
                 }
+                
             }
-            #output results of comparison
-            if ($ifTrue -eq "True") {
-                Write-Host "Manuscript table was successfully updated"
-                Write-Host ""
-            } else {
-                Write-Host "Manuscript table failed to update successfully" -ForegroundColor Red
-                Write-Host ""
+        }
+        #set flag true if valid version numbers found in table
+        for($i = 0; $i -lt $valueArr.Length; $i++){
+            if (-not($valueArr[$i] -match $version)) {
+                    $flag = $false
             }
+        }
+        #output results of comparison
+        if ($flag) {
+            Write-Host "Manuscript table was successfully updated" -ForegroundColor Green
         } else {
-            #no table was found in product file
-            Write-Host "No table present" -ForegroundColor Red
+            Write-Host "Error: Manuscript table was not successfully updated" -ForegroundColor Red
+        }
+        if ($overrideCheck -eq 1) {
+            Write-Host "Manuscript table was successfully overwritten" -ForegroundColor Green
+            Write-Host ""
+        } else {
+            Write-Host "Caution: Manuscript table was not overwritten" -ForegroundColor Yellow
             Write-Host ""
         }
-    }else{
-        #no product file was found in folder
-        Write-Host "No product file found" -ForegroundColor Red
+    } else {
+        #no table was found in product file
+        Write-Host "Error: No Manuscript table present" -ForegroundColor Red
         Write-Host ""
     }
+}else{
+    #no product file was found in folder
+    Write-Host "Error: No product file found" -ForegroundColor Red
+    Write-Host ""
 }
