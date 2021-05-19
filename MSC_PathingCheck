@@ -1,1 +1,71 @@
+Write-Output "Fourth part"
+#Fourth part of MS catalog validation scripts
+#Checks if the Carrier rating manuscripts have the correct effective dates in ms catalog.
 
+#input from employee
+#$clientName = Read-Host -Prompt "Enter client name (ex. TESTCLIENT) "
+$clientLOB = Read-Host -Prompt "Enter client's LOB folder (ex. Property) "
+$effectiveDates = Read-Host -Prompt "Enter effective dates (ex. AR_00_44, 2020-12-01, MT_00_42, 2020-11-01,etc...) "
+$filePath = 'C:\Users\ezekial.page\Desktop\ManuScriptCatalog.xml'
+#$filePath = "C:\SaaS\$clientName\shared\ManuScriptCatalog.xml"
+
+#separate effective date input
+$splitArr = $effectiveDates -split ", "
+$datesList = [object][System.Collections.ArrayList]@()
+For($i = 0; $i -lt $splitArr.Length; $i += 2){
+    $datesList.Add($splitArr[$i])
+    $datesList.Add($splitArr[$i+1])
+
+}
+
+#check contents of xml file for effective dates
+[XML] $inFile = Get-Content $filePath
+$idCheckBase = "Carrier_" + $clientLOB 
+$flag = $false
+$outString = ""
+for($j = 0; $j -lt $datesList.Count;$j +=2){
+    $idCheck = $idCheckBase + "_" + $datesList[$j]
+    $compDate = $datesList[$j+1]
+    #Write-Host "CompDate: "$compDate
+    foreach($empDetail in $inFile.entries.entry){
+        if($empDetail.ID -match $idCheck){
+        #Write-Host "Check: " + $empDetail.ID
+            $entryFlag = $true
+            $versionDate = $empDetail.versionDate
+            $effectiveDateNew = $empDetail.effectiveDateNew
+            $effectiveDateRenewal = $empDetail.effectiveDateRenewal
+
+            If($versionDate -ne $compDate){
+                If($entryFlag){
+                    $outString += "ID: " + $empDetail.ID + "`n"
+                    $entryFlag = $false
+                }
+                $outString += "Incorrect versionDate attribute.`n"
+                $flag  = $true
+            }
+            If($effectiveDateNew -ne $compDate){
+                If($entryFlag){
+                    $outString += "ID: " + $empDetail.ID + "`n"
+                    $entryFlag = $false
+                }
+                $outString += "Incorrect effectiveDateNew attribute.`n"
+                $flag  = $true
+            }
+            If($effectiveDateRenewal -ne $compDate){
+                If($entryFlag){
+                    $outString += "ID: " + $empDetail.ID + "`n"
+                    $entryFlag = $false
+                }
+                $outString += "Incorrect effectiveDateRenewal attribute.`n"
+                $flag  = $true
+            }
+            $outString += "`n"
+        }
+    }
+}
+If($flag){
+    Write-Host "Errors in ManuScriptCatalog: " -ForegroundColor Red
+    Write-Host $outString
+}else{
+    Write-Host "All Carrier Rating Manuscripts have correct effective dates." -ForegroundColor Green
+}
