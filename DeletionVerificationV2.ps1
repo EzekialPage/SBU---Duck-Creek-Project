@@ -1,11 +1,12 @@
-Write-Output "Second part:"
-#This script will iterate through a file strucutre and verify that 
-#the encoding line was removed from the top of the xml file 
+Write-Output "First part"
+#Validate encoding of file based on BOM (Byte Order Mark)
+#Based on code from https://gist.github.com/jpoehls/2406504
 
+#input from employee
 $clientName = Read-Host -Prompt "Enter client name (ex. TESTCLIENT) "
-$clientLOBName = Read-Host -Prompt "Enter client's LOB folder (ex. Property) "
-$clientPath = 'C:\SaaS\' + $clientName + '\Policy\ManuScripts\DCTTemplates\' + $clientLOBName
-#$clientPath ='C:\Users\ebpag\Desktop\DuckCreek\' + $clientName + '\'+ $clientLOBName 
+$clientLOB = Read-Host -Prompt "Enter client's LOB folder (ex. Property) "
+#$clientPath = 'C:\Users\ebpag\Desktop\DuckCreek\' + $clientName + '\'+ $clientLOB
+$clientPath = "C:\SaaS\$clientName\Policy\ManuScripts\DCTTemplates\$clientLOB"
 
 #create arraylist of file names
 function newestFileList($clPath){
@@ -93,6 +94,24 @@ function createFileList($arrList){
     return $outArr
 }
 
+#function to check file for UTF-8 encoding
+function getEncoding($fileName){
+    $ret = ""
+     [byte[]]$byte = get-content -Encoding byte -ReadCount 4 -TotalCount 4 -Path $fileName -ErrorAction SilentlyContinue
+     if($Error[0].Exception -is [System.UnauthorizedAccessException]){
+        $ret = "Access to " + $fileName + " was denied."
+     }
+    # EF BB BF (UTF8)
+    if($byte -ne $null){
+        if ( $byte[0] -eq 0xef -and $byte[1] -eq 0xbb -and $byte[2] -eq 0xbf  ) {
+            $ret =  'UTF-8 with BOM'
+        } else { 
+            $ret = 'Wrong encoding or no BOM'
+        }
+    }
+    return $ret
+}
+
 $flag = 0
 #Iterate through folders in LOB    
 Get-ChildItem -Path $clientPath | ForEach{
@@ -100,25 +119,29 @@ Get-ChildItem -Path $clientPath | ForEach{
     $stateName = $_.Name
     $outString = "Folder: " + $stateName + "`n"
     $newFiles = newestFileList($LobPath)
+    #Write-Host $newFiles
     $ifFlag = 0
     Get-ChildItem -Path $LobPath | ForEach{ 
         if($newFiles -contains $_.BaseName){
-            #determine if encoding line exists
-            $encodingLine = Get-ChildItem -Path $_.FullName -ErrorAction stop | Select-String -Pattern 'encoding="utf-8"'
+            #store output variable names
+            $fileInfo = Get-ChildItem -Path $_.FullName
+            $fileName = $fileInfo.Name
+            #store file encoding result in variable
+            $encodingCheck = getEncoding($_.FullName)
 
-            #display results to user
-            if ($encodingLine -ne $null) {
-
+            #check for incorrect encoding
+            if ($encodingCheck -eq 'Wrong encoding or no BOM' ) {
                 #check for previous errors
                 if($flag -eq 0){
-                    Write-Host "Utf-8 encoding line found in the following files:" -ForegroundColor Red
+                    Write-Host "The following files have incorrect encoding:" -ForegroundColor Red
                     $flag++
                 }
-                $fileName = $_.Name
                 $outString += $fileName + "`n"
                 $ifFlag++
+            }ElseIf($encodingCheck -ne 'UTF-8 with BOM'){
+                Write-Host $encodingCheck
             }
-        }#end if
+        }
     }
     if($ifFlag -ne 0){
         Write-Host $outString
@@ -126,5 +149,5 @@ Get-ChildItem -Path $clientPath | ForEach{
 }
 #check to see if there were no errors
 if($flag -eq 0){
-        Write-Host "No Utf-8 encoding lines were found" -ForegroundColor Green
+        Write-Host "All files have UTF-8 with BOM" -ForegroundColor Green
 }
