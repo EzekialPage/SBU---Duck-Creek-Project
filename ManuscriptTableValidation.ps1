@@ -76,7 +76,7 @@ if($newPath -ne "") {
         $overrideCheck = 0
         #iterate through xml file
         $counter = 0
-        $valueArr = @($null, $null, $null, $null)
+        $valueArr = @($null, $null, $null, $null, $null, $null, $null, $null)
         foreach ($empDetail in $tableData.ManuScript.model.object.table) {
             $tableName = $empDetail.id
             $targetName = "Manuscripts"+$clientLOB
@@ -88,17 +88,19 @@ if($newPath -ne "") {
                 }
                 foreach($empDetail2 in $empDetail.data.row.value){
                     #create array of values to check for updates
-                    if($counter -lt 4){
+                    #if($counter -lt 4){
                         $valueArr[$counter] = $empDetail2
                         $counter++
-                    }
+                    #}
                 }
                 
             }
         }
+        $checkLines = ""
         #set flag true if valid version numbers found in table
         for($i = 0; $i -lt $valueArr.Length; $i++){
-            if (-not($valueArr[$i] -match $version)) {
+            if (-not($valueArr[$i] -match $version) -and ($valueArr[$i] -ne $null)) {
+                    $checkLines += $valueArr[$i] + "`n"
                     $flag = $false
             }
         }
@@ -106,7 +108,8 @@ if($newPath -ne "") {
         if ($flag) {
             Write-Host "Manuscript table was successfully updated" -ForegroundColor Green
         } else {
-            Write-Host "Error: Manuscript table was not successfully updated" -ForegroundColor Red
+            Write-Host "Error: the following table values did not match the given version" -ForegroundColor Red
+            Write-Host $checkLines
         }
         if ($overrideCheck -eq 1) {
             Write-Host "Manuscript table was successfully overwritten" -ForegroundColor Green
